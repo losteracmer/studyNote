@@ -632,7 +632,9 @@ Thread 4	当前最新实际值：100
 
 HashSet与ArrayList一致 HashMap
 
-HashSet底层是一个HashMap，存储的值放在HashMap的key里，value存储了一个PRESENT的静态Object对象
+HashSet底层是一个HashMap，存储的值放在HashMap的key里，value存储了一个PRESENT的静态Object对象 创造了一个空对象
+
+[深入理解HashMap 和 currentHashMap](https://www.cnblogs.com/fsychen/p/9361858.html)
 
 #### 1、线程不安全
 
@@ -681,7 +683,7 @@ Exception in thread "Thread 10" java.util.ConcurrentModificationException
 
 一个人正在写入，另一个同学来抢夺，导致数据不一致，并发修改异常
 
-#### 3、解决方法：**CopyOnWriteArrayList
+#### 3、解决方法：CopyOnWriteArrayList
 
 ```
 List<String> list = new Vector<>();//Vector线程安全
@@ -713,7 +715,7 @@ CopyOnWrite容器即写时复制，往一个元素添加容器的时候，不直
     }
 ```
 
-
+CopyOnWriteArraySet 底层竟然还是构造了一个CopyOnWriteArrayList
 
 ### 五、公平锁、非公平锁、可重入锁、递归锁、自旋锁？手写自旋锁
 
@@ -960,7 +962,7 @@ CopyOnWrite容器即写时复制，往一个元素添加容器的时候，不直
     * 实现自旋锁
     * 自旋锁好处，循环比较获取知道成功位置，没有类似wait的阻塞
     *
-    * 通过CAS操作完成自旋锁，A线程先进来调用mylock方法自己持有锁5秒钟，B随后进来发现当前有线程持有锁，不是null，所以只能通过自旋等待，知道A释放锁后B随后抢到
+    * 通过CAS操作完成自旋锁，A线程先进来调用mylock方法自己持有锁5秒钟，B随后进来发现当前有线程持有锁，不是null，所以只能通过自旋等待，直到A释放锁后B随后抢到
     */
    public class SpinLockDemo {
        public static void main(String[] args) {
@@ -1006,6 +1008,8 @@ CopyOnWrite容器即写时复制，往一个元素添加容器的时候，不直
    }
    
    ```
+   
+   [atomic详解](https://blog.csdn.net/qq_34871626/article/details/81411815)
 
 ### 六、CountDownLatch/CyclicBarrier/Semaphore使用过吗
 
@@ -1138,6 +1142,54 @@ CopyOnWrite容器即写时复制，往一个元素添加容器的时候，不直
    }
    
    ```
+
+### wait()notify()notifyAll()锁池等待池
+* wait(): 使当前线程处于等待状态，直到另外的线程调用notify或notifyAll将它唤醒 （自动释放锁）
+
+* notify(): 唤醒该对象监听的其中一个线程（规则取决于JVM厂商，FILO,FIFO,随机…）
+
+* notifyAll(): 唤醒该对象监听的所有线程
+
+* 锁池： 假设T1线程已经拥有了某个对象(注意:不是类)的锁，而其它的线程想要调用该对象的synchronized方法(或者synchronized块)，
+  由于这些线程在进入对象的synchronized方法之前都需要先获得该对象的锁的拥有权，但是该对象的锁目前正被T1线程拥有，所以这些线程就进入了该对象的锁池中。
+
+* 等待池： 假设T1线程调用了某个对象的wait()方法，T1线程就会释放该对象的锁(因为wait()方法必须出现在synchronized中，
+  这样自然在执行wait()方法之前T1线程就已经拥有了该对象的锁)，同时T1线程进入到了该对象的等待池中。
+  如果有其它线程调用了相同对象的notifyAll()方法，那么处于该对象的等待池中的线程就会全部进入该对象的锁池中，从新争夺锁的拥有权。
+  如果另外的一个线程调用了相同对象的notify()方法，那么仅仅有一个处于该对象的等待池中的线程(随机)会进入该对象的锁池.
+
+**注意：**
+
+> * 在调用wait(), notify()或notifyAll()的时候，都必须获得某个对象(注意:不是类)的锁
+> * 永远在循环（loop）里调用 wait 和 notify，而不是在 If 语句中
+> * 永远在synchronized的函数或对象里使用wait、notify和notifyAll，不然Java虚拟机会生成 **IllegalMonitorStateException**。
+
+### 线程的状态
+
+> java中的线程的生命周期大体可分为5种状态。
+
+1. **新建(NEW)**：新创建了一个线程对象。
+
+2. **可运行(RUNNABLE)**：线程对象创建后，其他线程(比如main线程）调用了该对象的start()方法。该状态的线程位于可运行线程池中，等待被线程调度选中，获取cpu 的使用权 。
+
+3. **运行(RUNNING)**：可运行状态(runnable)的线程获得了cpu 时间片（timeslice） ，执行程序代码。
+4.  **阻塞(BLOCKED)**：阻塞状态是指线程因为某种原因放弃了cpu 使用权，也即让出了cpu timeslice，暂时停止运行。直到线程进入可运行(runnable)状态，才有机会再次获得cpu timeslice 转到运行(running)状态。阻塞的情况分三种： 
+
+> (一). 等待阻塞：运行(running)的线程执行o.wait()方法，JVM会把该线程放入等待队列(waitting queue)中。
+> (二). 同步阻塞：运行(running)的线程在获取对象的同步锁时，若该同步锁被别的线程占用，则JVM会把该线程放入锁池(lock pool)中。
+> (三). 其他阻塞：运行(running)的线程执行Thread.sleep(long ms)或t.join()方法，或者发出了I/O请求时，JVM会把该线程置为阻塞状态。当sleep()状态超时、join()等待线程终止或者超时、或者I/O处理完毕时，线程重新转入可运行(runnable)状态。
+
+5. **死亡(DEAD)**：线程run()、main() 方法执行结束，或者因异常退出了run()方法，则该线程结束生命周期。死亡的线程不可再次复生。
+
+![img](img_JUC多线程及高并发/432513-20171214160438717-1661848063.png)
+
+#### 几个方法的比较
+
+1. Thread.sleep(long millis)，一定是当前线程调用此方法，当前线程进入阻塞，但不释放对象锁，millis后线程自动苏醒进入可运行状态。作用：给其它线程执行机会的最佳方式。
+2. Thread.yield()，一定是当前线程调用此方法，当前线程放弃获取的cpu时间片，由运行状态变会可运行状态，让OS再次选择线程。作用：让相同优先级的线程轮流执行，但并不保证一定会轮流执行。实际中无法保证yield()达到让步目的，因为让步的线程还有可能被线程调度程序再次选中。Thread.yield()不会导致阻塞。
+3. t.join()/t.join(long millis)，当前线程里调用其它线程1的join方法，当前线程阻塞，但不释放对象锁，直到线程1执行完毕或者millis时间到，当前线程进入可运行状态。
+4. obj.wait()，当前线程调用对象的wait()方法，当前线程释放对象锁，进入等待队列。依靠notify()/notifyAll()唤醒或者wait(long timeout)timeout时间到自动唤醒。
+5. obj.notify()唤醒在此对象监视器上等待的单个线程，选择是任意性的。notifyAll()唤醒在此对象监视器上等待的所有线程。
 
 ### 七、阻塞队列
 
