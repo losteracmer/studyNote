@@ -480,7 +480,7 @@ false	 current data is 2019
 
 #### 3、CAS缺点
 
-1. ** 循环时间长，开销大**
+1. **循环时间长，开销大**
 
    例如getAndAddInt方法执行，有个do while循环，如果CAS失败，一直会进行尝试，如果CAS长时间不成功，可能会给CPU带来很大的开销
 
