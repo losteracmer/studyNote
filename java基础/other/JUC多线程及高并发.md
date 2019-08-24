@@ -502,6 +502,8 @@ CAS算法实现一个重要前提需要去除内存中某个时刻的数据并�
 
 #### 2、如何解决？原子引用
 
+通过AtomicStampedReference这个泛型类  它帮我们实现了变量的版本问题
+
 示例代码：
 
 ```java
@@ -679,9 +681,25 @@ Exception in thread "Thread 10" java.util.ConcurrentModificationException
 
 #### 2、导致原因
 
+```
 并发正常修改导致
 
 一个人正在写入，另一个同学来抢夺，导致数据不一致，并发修改异常
+
+进一步阅读源码，发现：
+
+　　1.modCount 时List从new开始，被修改的次数。当List调用Remove等方法时，modCount++
+
+　　2.expectedModCount是指Iterator现在期望这个list被修改的次数是多少次。是在Iterator初始化的时候将modCount 的值赋给了expectedModCount
+
+那么就解释了为什么会报上述异常：
+
+　　1.modCount 会随着调用List.remove方法而自动增减，而expectedModCount则不会变化，就导致modCount != expectedModCount。
+```
+
+> 没次修改modCount 都会改变，而修改操作会比较modCount和exceptedModCount的值是否相同，如果不同，则报错
+
+
 
 #### 3、解决方法：CopyOnWriteArrayList
 
@@ -1164,6 +1182,139 @@ CopyOnWriteArraySet 底层竟然还是构造了一个CopyOnWriteArrayList
 > * 永远在循环（loop）里调用 wait 和 notify，而不是在 If 语句中
 > * 永远在synchronized的函数或对象里使用wait、notify和notifyAll，不然Java虚拟机会生成 **IllegalMonitorStateException**。
 
+### await() signal() 方法
+
+> wait() 和 notify() 方法是 Object 的方法， 而 await() 和 signal() 方法是接口 Condition 的方法
+
+```java
+class BoundedBuffer {
+   final Lock lock = new ReentrantLock();
+   final Condition notFull  = lock.newCondition(); 
+   final Condition notEmpty = lock.newCondition(); 
+
+   final Object[] items = new Object[100];
+   int putptr, takeptr, count;
+
+   public void put(Object x) throws InterruptedException {
+     lock.lock();  
+     try {
+       while (count == items.length)
+         notFull.await();  // 让一个condition等待
+       items[putptr] = x;
+       if (++putptr == items.length) putptr = 0;
+       ++count;
+       notEmpty.signal();  //唤醒 notEmpty的condition
+     } finally {
+       lock.unlock();
+     }
+   }
+
+   public Object take() throws InterruptedException {
+     lock.lock();
+     try {
+       while (count == 0)
+         notEmpty.await();
+       Object x = items[takeptr];
+       if (++takeptr == items.length) takeptr = 0;
+       --count;
+       notFull.signal();
+       return x;
+     } finally {
+       lock.unlock();
+     }
+   }
+ }
+
+```
+
+- 上面的例子中， 在一个 lock 控制的临界区中， 出现了两种条件（notFull, notEmpty）的操作。
+- 下面假设我们要通过 wait() 和 notify() 粗暴地进行替换
+
+```java
+class BoundedBuffer {
+   final Lock lock = new ReentrantLock();
+   final Condition notFull  = lock.newCondition(); 
+   final Condition notEmpty = lock.newCondition(); 
+
+   final Object[] items = new Object[100];
+   int putptr, takeptr, count;
+
+   public void put(Object x) throws InterruptedException {
+     synchronized(lock)
+     {
+        while (count == items.length)
+            lock.wait();
+        items[putptr] = x;
+        if (++putptr == items.length) putptr = 0;
+        ++count;
+        lock.notify();
+     }
+   }
+
+   public Object take() throws InterruptedException {
+     synchronized(lock){
+       while (count == 0)
+         lock.wait();
+       Object x = items[takeptr];
+       if (++takeptr == items.length) takeptr = 0;
+       --count;
+       lock.notify();
+       return x;
+     } 
+   }
+ }
+```
+
+- 显然， 上述的代码仅仅在消费者和生产者分别只有一个时可以工作， 在有多个生产者和消费者时， 生产者A 可能会唤醒生产者 B 造成错误的结果， 为了避免这一错误。 则需要多个添加更多的对象， 使用**嵌套**的 synchronized 代码块。
+
+```java
+class BoundedBuffer {
+        final Lock lock = new ReentrantLock();
+        final Condition notFull = lock.newCondition();
+        final Condition notEmpty = lock.newCondition();
+
+        final Object[] items = new Object[100];
+        int putptr, takeptr, count;
+
+        public void put(Object x) throws InterruptedException {
+            synchronized (lock) {
+                synchronized (notFull) {
+                    while (count == items.length)
+                        notFull.wait();
+                }
+
+                items[putptr] = x;
+                if (++putptr == items.length) putptr = 0;
+                ++count;
+                synchronized (notEmpty) {
+                    notEmpty.notify();
+                }
+            }
+        }
+
+        public Object take() throws InterruptedException {
+            synchronized (lock) {
+                synchronized (notEmpty)
+                {
+                    while (count == 0)
+                        notEmpty.wait();
+                }
+
+                Object x = items[takeptr];
+                if (++takeptr == items.length) takeptr = 0;
+                --count;
+                synchronized (notFull)
+                {
+                    notFull.notify();
+                }
+                return x;
+            }
+        }
+    }
+```
+
+无论是可读性，还是复杂度，都不如condition
+
 ### 线程的状态
 
 > java中的线程的生命周期大体可分为5种状态。
@@ -1221,7 +1372,7 @@ CopyOnWriteArraySet 底层竟然还是构造了一个CopyOnWriteArrayList
 
    当阻塞队列是满时，从队列中==添加==元素的操作会被阻塞
 
-   试图从空的阻塞队列中获取元素的线程将会被阻塞，知道其他的线程网空的队列插入新的元素。
+   试图从空的阻塞队列中获取元素的线程将会被阻塞，直到其他的线程往空的队列插入新的元素。
 
    试图网已满的阻塞队列中添加新元素的线程同样会被阻塞，知道其他的线程从列中移除一个或者多个元素或者完全清空队列后使队列重新变得空闲起来并后续新增
 
@@ -1280,7 +1431,7 @@ CopyOnWriteArraySet 底层竟然还是构造了一个CopyOnWriteArrayList
      /**
       * ArrayBlockingQueue是一个基于数组结构的有界阻塞队列，此队列按FIFO原则对元素进行排序
       * LinkedBlockingQueue是一个基于链表结构的阻塞队列，此队列按FIFO排序元素，吞吐量通常要高于ArrayBlockingQueue
-      * SynchronousQueue是一个不存储元素的阻塞队列，灭个插入操作必须等到另一个线程调用移除操作，否则插入操作一直处于阻塞状态，吞吐量通常要高于
+      * SynchronousQueue是一个不存储元素的阻塞队列，每个插入操作必须等到另一个线程调用移除操作，否则插入操作一直处于阻塞状态，吞吐量通常要高于
       * 1.队列
       * 2.阻塞队列
       * 2.1 阻塞队列有没有好的一面
@@ -1761,9 +1912,9 @@ class MyThread2 implements Callable<Integer> {
 
      **执行长期的任务，性能好很多**
 
-     创建一个定长线程池，可控制线程最大并发数，炒出的线程回在队列中等待。
+     创建一个定长线程池，可控制线程最大并发数，超出的线程回在队列中等待。
 
-     newFixedThreadPool创建的线程池corePoolSize和maximumPoolSize值是想到等的，他使用的是LinkedBlockingQueue
+     newFixedThreadPool创建的线程池corePoolSize和maximumPoolSize值是相等的，他使用的是LinkedBlockingQueue
 
    - Executors.newSingleThreadExecutor()
 
@@ -1777,7 +1928,7 @@ class MyThread2 implements Callable<Integer> {
 
      **执行很多短期异步的小程序或负载较轻的服务器**
 
-     创建一个可缓存线程池，如果线程池长度超过处理需要，可灵活回收空闲县城，若无可回收，则新建线程。
+     创建一个可缓存线程池，如果线程池长度超过处理需要，可灵活回收空闲线程，若无可回收，则新建线程。
 
      newCachedThreadPool将corePoolSize设置为0，将maximumPoolSize设置为Integer.MAX_VALUE,使用的SynchronousQueue,也就是说来了任务就创建线程运行，当县城空闲超过60s，就销毁线程
 
@@ -1838,7 +1989,7 @@ end
 
    2.4如果队列满了且正在运行的线程数量大于或等于maxmumPoolSize，那么启动饱和拒绝策略来执行
 
-3. 当一个线程完成任务时，他会从队列中却下一个任务来执行
+3. 当一个线程完成任务时，他会从队列中取下一个任务来执行
 
 4. 当一个线程无事可做超过一定的时间（keepAliveTime）时，线程池会判断：
 
@@ -1882,7 +2033,7 @@ end
 
 线程池不允许使用Executors创建，试试通过ThreadPoolExecutor的方式，规避资源耗尽风险
 
-FixedThreadPool和SingleThreadPool允许请求队列长度为Integer.MAX_VALUE，可能会堆积大量请求；；CachedThreadPool和ScheduledThreadPool允许的创建线程数量为Integer.MAX_VALUE，可能会创建大量线程，导致OOM
+FixedThreadPool和SingleThreadPool允许请求队列长度为Integer.MAX_VALUE，可能会堆积大量请求；；CachedThreadPool和ScheduledThreadPool允许的创建线程数量为Integer.MAX_VALUE，可能会创建大量线程，导致OOM（OutOfMemory）
 
 #### 3、你在工作中时如何使用线程池的，是否自定义过线程池使用
 
@@ -1967,6 +2118,7 @@ public class MyThreadPoolDemo {
     threadB(线程B)
     lockA((锁A))
     lockB((锁B))
+   
     threadA--持有-->lockA
     threadB--试图获取-->lockA
     threadB--持有-->lockB
@@ -2030,3 +2182,4 @@ public class MyThreadPoolDemo {
 
    1. 使用`jps -l`定位进程号
    2. `jstack 进程号`找到死锁查看
+
