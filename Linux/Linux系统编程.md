@@ -50,31 +50,31 @@
 
 我们知道，每个进程在内核中都有一个进程控制块（PCB）来维护进程相关的信息，Linux内核的进程控制块是task_struct结构体。
 
-/usr/src/linux-headers-3.16.0-30/include/linux/sched.h文件中可以查看struct task_struct 结构体定义。其内部成员有很多，我们重点掌握以下部分即可：
+`/usr/src/linux-headers-3.16.0-30/include/linux/sched.h`文件中可以查看struct task_struct 结构体定义。其内部成员有很多，我们重点掌握以下部分即可：
 
-\* 进程id。系统中每个进程有唯一的id，在C语言中用pid_t类型表示，其实就是一个非负整数。
+* 进程id。系统中每个进程有唯一的id，在C语言中用pid_t类型表示，其实就是一个非负整数。
 
-\* 进程的状态，有就绪、运行、挂起、停止等状态。
+* 进程的状态，有就绪、运行、挂起、停止等状态。
 
-\* 进程切换时需要保存和恢复的一些CPU寄存器。
+* 进程切换时需要保存和恢复的一些CPU寄存器。
 
-\* 描述虚拟地址空间的信息。
+* 描述虚拟地址空间的信息。
 
-\* 描述控制终端的信息。
+* 描述控制终端的信息。
 
-\* 当前工作目录（Current Working Directory）。
+* 当前工作目录（Current Working Directory）。
 
-\* umask掩码。
+* umask掩码。
 
-\* 文件描述符表，包含很多指向file结构体的指针。
+* 文件描述符表，包含很多指向file结构体的指针。
 
-\* 和信号相关的信息。
+* 和信号相关的信息。
 
-\* 用户id和组id。
+* 用户id和组id。
 
-\* 会话（Session）和进程组。
+* 会话（Session）和进程组。
 
-\* 进程可以使用的资源上限（Resource Limit）。
+* 进程可以使用的资源上限（Resource Limit）。
 
 #### 进程状态（C 中）
 
@@ -124,15 +124,21 @@ $ echo $PATH
 
 获取环境变量值
 
-​    char *getenv(const char *name);  成功：返回环境变量的值；失败：NULL (name不存在)
+```c
+char *getenv(const char *name);  
+```
 
-练习：编程实现getenv函数。                                                                                                                                        【getenv.c】
+成功：返回环境变量的值；失败：NULL (name不存在)
 
 #### setenv函数
 
 设置环境变量的值         
 
-​    int setenv(const char *name, const char *value, int overwrite);          成功：0；失败：-1
+```c
+int setenv(const char *name, const char *value, int overwrite); 
+```
+
+​         成功：0；失败：-1
 
 ​         参数overwrite取值：   1：覆盖原环境变量 
 
@@ -142,21 +148,25 @@ $ echo $PATH
 
 删除环境变量name的定义
 
-​    int unsetenv(const char *name);   成功：0；失败：-1 
+```c
+int unsetenv(const char *name);   
+```
 
-​         注意事项：name不存在仍返回0(成功)，当name命名为"ABC="时则会出错。
+成功：0；失败：-1 
+
+ 注意事项：name不存在仍返回0(成功)，当name命名为"ABC="时则会出错。
 
 ### fork函数
 
 > 创建一个子进程。fork之后，操作系统会复制一个与父进程完全相同的子进程，虽说是父子关系，但是在操作系统看来，他们更像兄弟关系，这2个进程共享代码空间，但是数据空间是互相独立的，子进程数据空间中的内容是父进程的完整拷贝，指令指针也完全相同，子进程拥有父进程当前运行到的位置.两进程的程序计数器pc值相同
 
 
-```
+```c
 pid_t fork(void);
-失败返回-1；成功返回：
+/*失败返回-1；成功返回：
 父进程返回子进程的ID(非负)     
 子进程返回 0 
-pid_t类型表示进程ID，但为了表示-1，它是有符号整型。(0不是有效进程ID，init最小，为1)注意返回值，不是fork函数能返回两个值，而是fork后，fork函数变为两个，父子需【各自】返回一个。
+pid_t类型表示进程ID，但为了表示-1，它是有符号整型。(0不是有效进程ID，init最小，为1)注意返回值，不是fork函数能返回两个值，而是fork后，fork函数变为两个，父子需【各自】返回一个。*/
 ```
 
 #### 循环创建n个子进程
@@ -192,7 +202,7 @@ pid_t类型表示进程ID，但为了表示-1，它是有符号整型。(0不是
 
 1. 文件描述符(打开文件的结构体) 
 
-2. mmap建立的映射区 
+2. mmap（一种内存映射文件的方法）建立的映射区 
 
 #### gdb调试
 
@@ -202,7 +212,7 @@ set follow-fork-mode child 命令设置gdb在fork之后跟踪子进程。
 
 set follow-fork-mode parent 设置跟踪父进程。
 
-注意，一定要在fork     
+注意，一定要在fork之前？
 
 #### exec函数族 
 
@@ -212,6 +222,7 @@ fork创建子进程后执行的是和父进程相同的程序（但有可能执�
 
 其实有六种以exec开头的函数，统称exec函数：
 
+```c
 int execl(const char *path, const char *arg, ...);
 
 int execlp(const char *file, const char *arg, ...);
@@ -223,12 +234,15 @@ int execv(const char *path, char *const argv[]);
 int execvp(const char *file, char *const argv[]);
 
 int execve(const char *path, char *const argv[], char *const envp[]);
+```
 
 ##### execlp函数
 
 加载一个进程，借助PATH环境变量       
 
-int execlp(const char *file, const char *arg, ...);              成功：无返回；失败：-1
+```c
+int execlp(const char *file, const char *arg, ...);              //成功：无返回；失败：-1
+```
 
 ​    参数1：要加载的程序的名字。该函数需要配合PATH环境变量来使用，当PATH中所有目录搜索后没有参数1则出错返回。
 
@@ -238,7 +252,9 @@ int execlp(const char *file, const char *arg, ...);              成功：无返
 
 加载一个进程， 通过 路径+程序名 来加载。 
 
-​    int execl(const char *path, const char *arg, ...);              成功：无返回；失败：-1
+```c
+int execl(const char *path, const char *arg, ...);              成功：无返回；失败：-1
+```
 
 对比execlp，如加载"ls"命令带有-l，-F参数
 
@@ -257,8 +273,6 @@ int execvp(const char *file, const char *argv[]);
 变参终止条件：① NULL结尾 ② 固参指定
 
 execvp与execlp参数形式不同，原理一致。
-
-练习：将当前系统中的进程信息，打印到文件中。                                                                                           【exec_ps.c】
 
 ##### exec函数族一般规律
 
@@ -280,7 +294,7 @@ e (environment)       使用环境变量数组,不使用进程原有的环境变
 
 #### 孤儿进程
 
-​         孤儿进程: 父进程先于子进程结束，则子进程成为孤儿进程，子进程的父进程成为init进程，称为init进程领养孤儿进程。
+孤儿进程: 父进程先于子进程结束，则子进程成为孤儿进程，子进程的父进程成为init进程，称为init进程领养孤儿进程。
 
 > 正常情况下 父进程死后，子进程的pid会被init 进程回收，这个进程的pid 在root执行的情况下为1  ，但是如果是一般用户，进程id 可能不为1！
 
@@ -315,7 +329,7 @@ Linux环境下，进程地址空间相互独立，每个进程各自有不同的
 
 > linux 下的文件类型
 >
-> * \- 文件
+> * f  文件
 > * d 目录
 > * l 符号链接
 > * s 套接字
@@ -324,6 +338,11 @@ Linux环境下，进程地址空间相互独立，每个进程各自有不同的
 > * p 管道
 >
 > 只有前三种是文件，占用磁盘空间，后面的都是伪文件
+
+**java的进程间通信：**
+
+我们把Java进程理解为JVM进程。很明显，传统的这些大部分技术是无法被我们的应用程序利用了（这些进程间通信都是靠系统调用来实现的）。但是Java也有很多方法可以进行进程间通信的。 
+除了上面提到的Socket之外，当然首选的IPC可以使用Rmi，或者Corba也可以。另外**Java nio的MappedByteBuffer**也可以通过内存映射文件来实现进程间通信(共享内存)。
 
 ### 管道
 
@@ -347,7 +366,7 @@ Linux环境下，进程地址空间相互独立，每个进程各自有不同的
 
 * 由于管道采用半双工通信方式。因此，数据只能在一个方向上流动。
 
-* 只能在有公共祖先的进程间使用管道。
+* 只能在有公共祖先的进程间使用管道。（一般用于父子进程）
 
 常见的通信方式有，单工通信、半双工通信、全双工通信。
 
@@ -449,9 +468,9 @@ FIFO常被称为命名管道，以区分管道(pipe)。管道(pipe)只能用于�
 
 #### 存储映射I/O 
 
-​         存储映射I/O (Memory-mapped I/O) 使一个磁盘文件与存储空间中的一个缓冲区相映射。于是当从缓冲区中取数据，就相当于读文件中的相应字节。于此类似，将数据存入缓冲区，则相应的字节就自动写入文件。这样，就可在不适用read和write函数的情况下，使用地址（指针）完成I/O操作。
+存储映射I/O (Memory-mapped I/O) 使一个磁盘文件与存储空间中的一个缓冲区相映射。于是当从缓冲区中取数据，就相当于读文件中的相应字节。于此类似，将数据存入缓冲区，则相应的字节就自动写入文件。这样，就可在不适用read和write函数的情况下，使用地址（指针）完成I/O操作。
 
-​         使用这种方法，首先应通知内核，将一个指定文件映射到存储区域中。这个映射工作可以通过mmap函数来实现。
+使用这种方法，首先应通知内核，将一个指定文件映射到存储区域中。这个映射工作可以通过mmap函数来实现。
 
 ![1565104497812](img_Linux系统编程/1565104497812.png)
 
