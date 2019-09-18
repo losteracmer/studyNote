@@ -1937,6 +1937,10 @@ class MyThread2 implements Callable<Integer> {
      创建一个可缓存线程池，如果线程池长度超过处理需要，可灵活回收空闲线程，若无可回收，则新建线程。
 
      newCachedThreadPool将corePoolSize设置为0，将maximumPoolSize设置为Integer.MAX_VALUE,使用的SynchronousQueue,也就是说来了任务就创建线程运行，当县城空闲超过60s，就销毁线程
+     
+   - newScheduledThreadPool(int corePoolSize)
+
+     类似于newCachedThreadPool，创建一个缓存线程池，此线程池还支持定时以及周期性执行任务。
 
 3. **ThreadPoolExecutor**
 

@@ -8,6 +8,8 @@
 
 ## NIO
 
+[这个博客讲的很好](https://blog.csdn.net/u011381576/article/details/79876754)
+
 Java NIO 的核心组成部分：
 
 1. **Channels**
@@ -43,6 +45,69 @@ public static ByteBuffer allocateDirect(int capacity)
 
 > 由图能够看出，当操作数据量非常小时，两种分配方式操作使用时间基本是同样的，第一种方式有时可能会更快，可是当数据量非常大时，另外一种方式会远远大于第一种的分配方式
 
+使用Buffer一般遵循下面几个步骤：
+
+- 分配空间（ByteBuffer buf = ByteBuffer.allocate(1024); 还有一种allocateDirector后面再陈述）
+- 写入数据到Buffer(int bytesRead = fileChannel.read(buf);)
+- 调用filp()方法（ buf.flip();）
+- 从Buffer中读取数据（System.out.print((char)buf.get());）
+- 调用clear()方法或者compact()方法
+
+
+
+Buffer顾名思义：缓冲区，实际上是一个容器，一个连续数组。Channel提供从文件、网络读取数据的渠道，但是读写的数据都必须经过Buffer。如下图：
+
+![img](img_IO/2019050721080739.png)
+
+
+
+向Buffer中写数据：
+
+- 从Channel写到Buffer (fileChannel.read(buf))
+- 通过Buffer的put()方法 （buf.put(…)）
+
+从Buffer中读取数据：
+
+- 从Buffer读取到Channel (channel.write(buf))
+- 使用get()方法从Buffer中读取数据 （buf.get()）
+
+可以把Buffer简单地理解为一组基本数据类型的元素列表，它通过几个变量来保存这个数据的当前位置状态：capacity, position, limit, mark：
+
+| 索引     | 说明                                                    |
+| -------- | ------------------------------------------------------- |
+| capacity | 缓冲区数组的总长度                                      |
+| position | 下一个要操作的数据元素的位置                            |
+| limit    | 缓冲区数组中不可操作的下一个元素的位置：limit<=capacity |
+| mark     | 用于记录当前position的前一个位置或者默认是-1            |
+
+![img](img_IO/20190507210823301.png)
+
+举例：我们通过ByteBuffer.allocate(11)方法创建了一个11个byte的数组的缓冲区，初始状态如上图，position的位置为0，capacity和limit默认都是数组长度。当我们写入5个字节时，变化如下图：
+
+![img](img_IO/20190507210846339.png)
+
+
+
+这时我们需要将缓冲区中的5个字节数据写入Channel的通信信道，所以我们调用ByteBuffer.flip()方法，变化如下图所示(position设回0，并将limit设成之前的position的值)：
+
+![img](img_IO/20190507210902972.png)
+
+这时底层操作系统就可以从缓冲区中正确读取这个5个字节数据并发送出去了。在下一次写数据之前我们再调用clear()方法，缓冲区的索引位置又回到了初始位置。
+
+调用clear()方法：position将被设回0，limit设置成capacity，换句话说，Buffer被清空了，其实Buffer中的数据并未被清除，只是这些标记告诉我们可以从哪里开始往Buffer里写数据。如果Buffer中有一些未读的数据，调用clear()方法，数据将“被遗忘”，意味着不再有任何标记会告诉你哪些数据被读过，哪些还没有。如果Buffer中仍有未读的数据，且后续还需要这些数据，但是此时想要先写些数据，那么使用compact()方法。compact()方法将所有未读的数据拷贝到Buffer起始处。然后将position设到最后一个未读元素正后面。limit属性依然像clear()方法一样，设置成capacity。现在Buffer准备好写数据了，但是不会覆盖未读的数据。
+
+通过调用Buffer.mark()方法，可以标记Buffer中的一个特定的position，之后可以通过调用Buffer.reset()方法恢复到这个position。Buffer.rewind()方法将position设回0，所以你可以重读Buffer中的所有数据。limit保持不变，仍然表示能从Buffer中读取多少个元素。
+
+//这一段 好晦涩难懂
+
+
+
+
+
+
+
+
+
 OK ，进入正题
 
 在标准的IO当中，都是基于字节流/字符流进行操作的，而在NIO中则是是基于Channel和Buffer进行操作，其中的Channel的虽然模拟了流的概念，实则大不相同。
@@ -74,6 +139,14 @@ IO操作由CPU负责
 > Channel为完全独立的单元，不需要向CPU申请权限，专门用于IO
 
 ![img](img_IO/307536-20170731144908771-376135818.png)
+
+
+
+[零拷贝](https://mp.weixin.qq.com/s?__biz=MzU0MzQ5MDA0Mw==&mid=2247483913&idx=1&sn=2da53737b8e8908cf3efdae9621c9698&chksm=fb0be89dcc7c618b0d5a1ba8ac654295454cfc2fa81fbae5a6de49bf0a91a305ca707e9864fc&scene=21#wechat_redirect)
+
+
+
+
 
 #### 获取channel的方法
 
