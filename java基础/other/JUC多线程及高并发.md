@@ -2197,7 +2197,7 @@ public class MyThreadPoolDemo {
 
 > java的对象分为三块区域，对象头，实例数据域，对齐填充，其中对象头又分为：mark word + 指向方法区中的类元数据
 
-
+[synchronized实现原理，锁优化](https://blog.csdn.net/qq_41701956/article/details/83660927)
 
 mark word 的结构：
 
