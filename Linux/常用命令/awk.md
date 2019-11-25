@@ -41,7 +41,28 @@ $ awk '$2<75 {printf "%s\t%s\n", $0, "REORDER";} $2>=75 {print $0;}' testfile
 # ; 可加 也可以 不加  printf 也可以像C中加括号，如：
 $ awk '/ /{c=c+1} END {printf("%d\n",c);}' html1.html 
 # 统计含有空格的行数，并最终输出
+
 ```
+
+```
+# 统计/proc/net/tcp 中各种状态的数量
+awk 'BEGIN{ESTABLISHED=0;SYN_SENT=0;SYN_RECV=0;FIN_WAIT1=0;FIN_WAIT2=0;TIME_WAIT=0;CLOSE=0;CLOSE_WAIT=0;LAST_ACK=0;LISTEN=0;CLOSING=0}\
+ {if($4==01){ESTABLISHED=ESTABLISHED+1}\
+ else if($4==02){SYN_SENT=SYN_SENT+1}\
+ else if($4==03){SYN_RECV=SYN_RECV+1}\
+ else if($4==04){FIN_WAIT1=FIN_WAIT1+1}\
+ else if($4==05){FIN_WAIT2=FIN_WAIT2+1}\
+ else if($4==06){TIME_WAIT=TIME_WAIT+1}\
+ else if($4==07){CLOSE=CLOSE+1}\
+ else if($4==08){CLOSE_WAIT=CLOSE_WAIT+1}\
+ else if($4==09){LAST_ACK=LAST_ACK+1}\
+ else if($4==10){LISTEN=LISTEN+1}\
+ else if($4==0A){CLOSING=CLOSING+1}}\
+  END{printf("ESTABLISHED=%d\nSYN_SENT=%d\nSYN_RECV=%d\nFIN_WAIT1=%d\nFIN_WAIT2=%d\nTIME_WAIT=%d\nCLOSE=%d\nCLOSE_WAIT=%d\nLAST_ACK=%d\nLISTEN=%d\nCLOSING=%d\n",ESTABLISHED,SYN_SENT,SYN_RECV,FIN_WAIT1,FIN_WAIT2,TIME_WAIT,CLOSE,CLOSE_WAIT,LAST_ACK,LISTEN,CLOSING)}'\
+ /proc/net/tcp
+```
+
+
 
 ```sh
 ProductA 30 REORDER
