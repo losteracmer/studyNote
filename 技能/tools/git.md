@@ -74,3 +74,10 @@ git push --delete origin oldName
 git push origin newName
 git branch --set-upstream-to origin/newName # 把修改后的本地分支与远程分支关联
 ```
+
+#### git add的撤销
+
+```git
+git add <file>
+git reset <file>
+```
